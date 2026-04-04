@@ -31,7 +31,7 @@ esac
 if [ -n "$1" ]; then
     VERSION="$1"
 else
-    VERSION=$(curl -fsSL -o /dev/null -w '%{redirect_url}' "https://github.com/${GITHUB_REPO}/releases/latest" | grep -oE '[^/]+$' | sed 's/^v//')
+    VERSION=$(curl -fsSL "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" | grep '"tag_name"' | sed 's/.*"v\(.*\)".*/\1/')
     if [ -z "$VERSION" ]; then
         echo "Error: could not determine latest version"
         exit 1
