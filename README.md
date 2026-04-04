@@ -1,6 +1,41 @@
-# Codity CLI Releases
+# Codity CLI
 
 Pre-built binaries for the Codity CLI. Download the appropriate archive for your platform from the [Releases](https://github.com/codity-ai/codity-cli/releases) page.
+
+## Quick Install (macOS / Linux)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/codity-ai/codity-cli/main/install.sh | sh
+```
+
+To install a specific version:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/codity-ai/codity-cli/main/install.sh | sh -s 0.1.0
+```
+
+## Manual Install
+
+1. Download the archive for your platform from [Releases](https://github.com/codity-ai/codity-cli/releases)
+2. Extract and move to your PATH:
+
+```bash
+# macOS / Linux
+tar -xzf codity_*_*.tar.gz
+sudo mv codity /usr/local/bin/
+```
+
+```powershell
+# Windows
+Expand-Archive codity_*_windows_*.zip -DestinationPath .
+Move-Item codity.exe C:\Windows\System32\
+```
+
+3. Verify:
+
+```bash
+codity --version
+```
 
 ## Platforms
 
@@ -13,10 +48,9 @@ Pre-built binaries for the Codity CLI. Download the appropriate archive for your
 | Windows | amd64 | `codity_*_windows_amd64.zip` |
 | Windows | arm64 | `codity_*_windows_arm64.zip` |
 
-## Install
+## Getting Started
 
 ```bash
-# macOS / Linux
-curl -fsSL https://github.com/codity-ai/codity-cli/releases/latest/download/codity_<version>_<os>_<arch>.tar.gz | tar -xz
-sudo mv codity /usr/local/bin/
+codity login
+codity review --staged
 ```
