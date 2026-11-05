@@ -1,8 +1,9 @@
 #!/bin/sh
 set -e
 
-GITHUB_REPO="codity-ai/codity-cli"
-INSTALL_DIR="/usr/local/bin"
+DOWNLOAD_BASE_URL="${CODITY_RELEASES_URL:-https://github.com/codity-ai/codity-cli/releases/download}"
+LATEST_URL="${CODITY_LATEST_URL:-https://github.com/codity-ai/codity-cli/releases/latest}"
+INSTALL_DIR="${CODITY_INSTALL_DIR:-/usr/local/bin}"
 BINARY_NAME="codity"
 
 # Detect OS and architecture
@@ -28,34 +29,61 @@ case "$OS" in
 esac
 
 # Determine version to install
-if [ -n "$1" ]; then
+if [ -n "${1:-}" ]; then
     VERSION="$1"
 else
-    VERSION=$(curl -fsSL "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" | grep '"tag_name"' | sed 's/.*"v\(.*\)".*/\1/')
+    LATEST_EFFECTIVE_URL=$(curl -fsSL -o /dev/null -w '%{url_effective}' "$LATEST_URL")
+    case "$LATEST_EFFECTIVE_URL" in
+        */releases/tag/v*) VERSION=${LATEST_EFFECTIVE_URL##*/tag/} ;;
+        *) echo "Error: could not determine latest release tag"; exit 1 ;;
+    esac
     if [ -z "$VERSION" ]; then
         echo "Error: could not determine latest version"
         exit 1
     fi
 fi
+VERSION=${VERSION#v}
+case "$VERSION" in
+    ''|*[!0-9A-Za-z.+-]*) echo "Error: invalid release version"; exit 1 ;;
+esac
+DOWNLOAD_BASE_URL=${DOWNLOAD_BASE_URL%/}
 
 ARCHIVE="codity_${VERSION}_${OS}_${ARCH}.tar.gz"
-URL="https://github.com/${GITHUB_REPO}/releases/download/v${VERSION}/${ARCHIVE}"
+URL="${DOWNLOAD_BASE_URL}/v${VERSION}/${ARCHIVE}"
 
 echo "Installing codity v${VERSION} (${OS}/${ARCH})..."
 
 # Download and extract
-TMPDIR=$(mktemp -d)
-trap 'rm -rf "$TMPDIR"' EXIT
+INSTALL_TEMP_DIR=$(mktemp -d)
+trap 'rm -rf "$INSTALL_TEMP_DIR"' EXIT
 
-curl -fsSL "$URL" -o "${TMPDIR}/${ARCHIVE}"
-tar -xzf "${TMPDIR}/${ARCHIVE}" -C "$TMPDIR"
+curl -fsSL "$URL" -o "${INSTALL_TEMP_DIR}/${ARCHIVE}"
+curl -fsSL "${DOWNLOAD_BASE_URL}/v${VERSION}/checksums.txt" -o "${INSTALL_TEMP_DIR}/checksums.txt"
+EXPECTED=$(awk -v archive="$ARCHIVE" '$2 == archive {print $1}' "${INSTALL_TEMP_DIR}/checksums.txt")
+if [ "${#EXPECTED}" -ne 64 ]; then
+    echo "Error: release checksum is missing or invalid"
+    exit 1
+fi
+if command -v sha256sum >/dev/null 2>&1; then
+    ACTUAL=$(sha256sum "${INSTALL_TEMP_DIR}/${ARCHIVE}" | awk '{print $1}')
+else
+    ACTUAL=$(shasum -a 256 "${INSTALL_TEMP_DIR}/${ARCHIVE}" | awk '{print $1}')
+fi
+if [ "$ACTUAL" != "$EXPECTED" ]; then
+    echo "Error: release checksum verification failed"
+    exit 1
+fi
+tar -xzf "${INSTALL_TEMP_DIR}/${ARCHIVE}" -C "$INSTALL_TEMP_DIR" "$BINARY_NAME"
+if [ ! -d "$INSTALL_DIR" ]; then
+    mkdir -p "$INSTALL_DIR"
+fi
 
 # Install binary
 if [ -w "$INSTALL_DIR" ]; then
-    mv "${TMPDIR}/${BINARY_NAME}" "${INSTALL_DIR}/${BINARY_NAME}"
+    mv "${INSTALL_TEMP_DIR}/${BINARY_NAME}" "${INSTALL_DIR}/${BINARY_NAME}"
 else
     echo "Installing to ${INSTALL_DIR} (requires sudo)..."
-    sudo mv "${TMPDIR}/${BINARY_NAME}" "${INSTALL_DIR}/${BINARY_NAME}"
+    sudo mv "${INSTALL_TEMP_DIR}/${BINARY_NAME}" "${INSTALL_DIR}/${BINARY_NAME}"
 fi
 
 chmod +x "${INSTALL_DIR}/${BINARY_NAME}"
